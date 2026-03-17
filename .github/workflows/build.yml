@@ -23,6 +23,8 @@ jobs:
 
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
+      with:
+        cache-read-only: false
 
     - name: Copy id_map.json to assets
       run: |
@@ -30,10 +32,10 @@ jobs:
         cp id_map.json app/src/main/assets/
 
     - name: Build Debug APK
-      run: gradle assembleDebug
+      run: gradle assembleDebug --no-configuration-cache
 
     - name: Build Release APK
-      run: gradle assembleRelease
+      run: gradle assembleRelease --no-configuration-cache
 
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
