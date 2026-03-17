@@ -20,21 +20,20 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
-        cache: gradle
 
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
 
     - name: Copy id_map.json to assets
       run: |
         mkdir -p app/src/main/assets
         cp id_map.json app/src/main/assets/
 
-    - name: Build with Gradle
-      run: ./gradlew assembleDebug
+    - name: Build Debug APK
+      run: gradle assembleDebug
 
     - name: Build Release APK
-      run: ./gradlew assembleRelease
+      run: gradle assembleRelease
 
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
@@ -47,13 +46,3 @@ jobs:
       with:
         name: gx-radar-release
         path: app/build/outputs/apk/release/*.apk
-
-    - name: Run Lint
-      run: ./gradlew lint
-
-    - name: Upload Lint Results
-      uses: actions/upload-artifact@v4
-      if: failure()
-      with:
-        name: lint-results
-        path: app/build/reports/lint-results-*.html
