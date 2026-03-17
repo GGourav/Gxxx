@@ -11,6 +11,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: GXRadar
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -25,10 +29,9 @@ jobs:
       uses: gradle/actions/setup-gradle@v3
       with:
         gradle-version: 8.5
-        cache-read-only: false
 
-    - name: Generate Gradle Wrapper
-      run: gradle wrapper --gradle-version 8.5
+    - name: Make gradlew executable
+      run: chmod +x gradlew
 
     - name: Copy id_map.json to assets
       run: |
@@ -45,10 +48,10 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: gx-radar-debug
-        path: app/build/outputs/apk/debug/*.apk
+        path: GXRadar/app/build/outputs/apk/debug/*.apk
 
     - name: Upload Release APK
       uses: actions/upload-artifact@v4
       with:
         name: gx-radar-release
-        path: app/build/outputs/apk/release/*.apk
+        path: GXRadar/app/build/outputs/apk/release/*.apk
