@@ -1,0 +1,90 @@
+{
+  "version": "2026-03-16-v2",
+  "comment": "Photon param key mappings. Update after each Albion patch. Set key to -1 to force Plan B.",
+
+  "common": {
+    "objectIdKey": 0,
+    "posXKey": 8,
+    "posYKey": 9
+  },
+
+  "joinFinished": {
+    "comment": "LOCAL PLAYER zone entry — fires BEFORE NewCharacter",
+    "localObjectIdKey": 0,
+    "posXKey": 8,
+    "posYKey": 9
+  },
+
+  "harvestable": {
+    "typeNameKey": 1,
+    "listKey": 2,
+    "tierKey": 7,
+    "enchantKey": 11
+  },
+
+  "mob": {
+    "typeNameKey": 1,
+    "tierKey": 7,
+    "enchantKey": 11,
+    "isBossKey": 50,
+    "healthKey": 12
+  },
+
+  "player": {
+    "nameKey": 1,
+    "guildKey": 3,
+    "allianceKey": 4,
+    "factionFlagKey": 23,
+    "healthKey": 12,
+    "mountKey": 26
+  },
+
+  "silver": {
+    "typeNameKey": 1,
+    "amountKey": 2
+  },
+
+  "chest": {
+    "typeNameKey": 1,
+    "rarityKey": 7
+  },
+
+  "dungeon": {
+    "typeNameKey": 1,
+    "rarityKey": 7
+  },
+
+  "mist": {
+    "typeNameKey": 1,
+    "rarityKey": 7
+  },
+
+  "knownPrefixes": {
+    "fiber": ["FIBER", "COTTON", "HEMP", "FLAX", "SILK", "SPONGE"],
+    "ore": ["ORE", "IRON", "STEEL", "TITANIUM", "RUNITE", "METEORITE"],
+    "logs": ["WOOD", "LOG", "BIRCH", "OAK", "CEDAR", "PINE", "FROSTWOOD"],
+    "rock": ["ROCK", "STONE", "LIMESTONE", "SANDSTONE", "TRAVERTINE", "GRANITE"],
+    "hide": ["HIDE", "LEATHER", "REPTILE", "BEAR", "DIREWOLF"],
+    "crop": ["WHEAT", "CROP", "CARROT", "TURNIP", "CABBAGE", "BEAN"],
+    "mist": ["MIST_WISP", "MIST_KEEPER", "MIST_HERALD", "MISTS_CAGEDWISP"],
+    "boss": ["BOSS", "ELDER", "ANCIENT", "GUARDIAN", "KEEPER", "MISTBOSS"]
+  },
+
+  "eventCodeSeeds": {
+    "comment": "Seed table only — populated fully by DiscoveryLogger on first run. DO NOT dispatch by these ints.",
+    "1": "NewCharacter",
+    "2": "Leave",
+    "3": "Move",
+    "4": "NewMob",
+    "5": "NewSimpleHarvestableObject",
+    "18": "JoinFinished",
+    "19": "NewSimpleHarvestableObjectList",
+    "20": "ChangeCluster",
+    "24": "HarvestFinished"
+  },
+
+  "coordinatePlanB": {
+    "minValid": -32768.0,
+    "maxValid": 32768.0
+  }
+}
