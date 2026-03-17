@@ -1,0 +1,59 @@
+name: Build GX Radar APK
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Copy id_map.json to assets
+      run: |
+        mkdir -p app/src/main/assets
+        cp id_map.json app/src/main/assets/
+
+    - name: Build with Gradle
+      run: ./gradlew assembleDebug
+
+    - name: Build Release APK
+      run: ./gradlew assembleRelease
+
+    - name: Upload Debug APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: gx-radar-debug
+        path: app/build/outputs/apk/debug/*.apk
+
+    - name: Upload Release APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: gx-radar-release
+        path: app/build/outputs/apk/release/*.apk
+
+    - name: Run Lint
+      run: ./gradlew lint
+
+    - name: Upload Lint Results
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: lint-results
+        path: app/build/reports/lint-results-*.html
