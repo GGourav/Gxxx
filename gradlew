@@ -135,3 +135,67 @@ if "$cygwin" || "$msys" ; then
 
     # Now convert the arguments - kludge to limit ourselves to /bin/sh
     for arg do
+        if
+            case $arg in                                #(
+              -*)   false ;;                            # don't mess with options #(
+              /?*)  t=${arg#)}; t=/${t%%/*}             # looks like a POSIX filepath
+                    [ -e "$t" ] ;;                      #(
+              *)    false ;;
+            esac
+        then
+            arg=$( cygpath --path --ignore --mixed "$arg" )
+        fi
+        # Roll the args list around exactly as many times as the number of
+        # temporary variables assigned, so each argument winds up back in the
+        # position where it started.
+        shift                   # remove old arg
+        set -- "$@" "$arg"      # push replacement arg
+    done
+fi
+
+
+# Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
+DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+
+# Collect all arguments for the java command:
+#   * DEFAULT_JVM_OPTS, JAVA_OPTS, GRADLE_OPTS, and optsEnvironmentVar are not
+#     temporary variables; complex values can be substituted.
+#   * Zsh and bash can contain nested substitutions in variables.
+#   * Only the simple case is implemented here: replace ${var} with its value.
+#   * If ${var} contains nested substitutions, they will not be expanded.
+#   * The result is left unquoted, to allow further word splitting and globbing.
+
+# Collect all arguments for the java command
+set -- \
+        "-Dorg.gradle.appname=$APP_BASE_NAME" \
+        -classpath "$CLASSPATH" \
+        org.gradle.wrapper.GradleWrapperMain \
+        "$@"
+
+# Stop when "xargs" is not available.
+if ! command -v xargs >/dev/null 2>&1
+then
+    die "xargs is not available"
+fi
+
+# Use "xargs" to parse quoted args.
+#
+# With -n://--no-run-if-empty we can safely handle empty input:
+#   $ find /tmp -name '*.pdf' -print0 | xargs -0 -n1 ls
+#   ...
+#   $ find /tmp -name '*.pdf' -print0 | xargs -n1 ls     # WRONG!
+#   ...
+# With default POSIX xargs, you need -r or --no-run-if-empty:
+#   $ find /tmp -name '*.pdf' -print0 | xargs -0 -r -n1 ls
+#   ...
+# Unfortunately, -r is a GNU extension; on macOS, use:
+#   $ find /tmp -name '*.pdf' -print0 | xargs -0 -n1 ls || true
+
+eval "set -- $(
+        printf '%s\n' "$DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS" |
+        xargs -n1 |
+        sed ' s~[^-[:alnum:]+,./:=@_]~\\&~g; ' |
+        tr '\n' ' '
+    )" '"$@"'
+
+exec "$JAVACMD" "$@"
