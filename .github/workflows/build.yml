@@ -15,9 +15,6 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: List files
-      run: ls -la
-
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
@@ -29,22 +26,26 @@ jobs:
       with:
         gradle-version: 8.5
 
-    - name: Find project location
-      run: |
-        echo "Looking for build.gradle..."
-        find . -name "build.gradle" -type f
-        echo "Looking for settings.gradle..."
-        find . -name "settings.gradle" -type f
+    - name: Make gradlew executable
+      run: chmod +x gradlew
+
+    - name: Copy id_map.json to assets
+      run: mkdir -p app/src/main/assets && cp id_map.json app/src/main/assets/
 
     - name: Build Debug APK
-      run: |
-        PROJECT_DIR=$(dirname $(find . -name "settings.gradle" -type f | head -1))
-        echo "Project directory: $PROJECT_DIR"
-        cd "$PROJECT_DIR"
-        gradle wrapper --gradle-version 8.5
-        chmod +x gradlew
-        ./gradlew assembleDebug --no-configuration-cache
+      run: ./gradlew assembleDebug --no-configuration-cache
 
     - name: Build Release APK
-      run: |
-        PROJECT_DIR=$(dirname $(find . -name "settings.gradle" -type f
+      run: ./gradlew assembleRelease --no-configuration-cache
+
+    - name: Upload Debug APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: gx-radar-debug
+        path: app/build/outputs/apk/debug/*.apk
+
+    - name: Upload Release APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: gx-radar-release
+        path: app/build/outputs/apk/release/*.apk
