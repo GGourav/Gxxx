@@ -25,3 +25,30 @@ jobs:
       uses: gradle/actions/setup-gradle@v3
       with:
         gradle-version: 8.5
+        cache-read-only: false
+
+    - name: Generate Gradle Wrapper
+      run: gradle wrapper --gradle-version 8.5
+
+    - name: Copy id_map.json to assets
+      run: |
+        mkdir -p app/src/main/assets
+        cp id_map.json app/src/main/assets/
+
+    - name: Build Debug APK
+      run: ./gradlew assembleDebug --no-configuration-cache
+
+    - name: Build Release APK
+      run: ./gradlew assembleRelease --no-configuration-cache
+
+    - name: Upload Debug APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: gx-radar-debug
+        path: app/build/outputs/apk/debug/*.apk
+
+    - name: Upload Release APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: gx-radar-release
+        path: app/build/outputs/apk/release/*.apk
