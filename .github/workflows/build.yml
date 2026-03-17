@@ -26,8 +26,8 @@ jobs:
       with:
         gradle-version: 8.5
 
-    - name: Make gradlew executable
-      run: chmod +x gradlew
+    - name: Generate Gradle Wrapper
+      run: gradle wrapper --gradle-version 8.5
 
     - name: Copy id_map.json to assets
       run: mkdir -p app/src/main/assets && cp id_map.json app/src/main/assets/
