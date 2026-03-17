@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vpn-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+    VPN Service Description for API 34+
+    This file provides justification for specialUse foreground service type.
+    -->
+    <description>GX Radar captures network traffic from Albion Online (com.albiononline) exclusively to display nearby game entities on a radar overlay. No data is transmitted externally.</description>
+</vpn-config>
