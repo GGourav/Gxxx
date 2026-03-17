@@ -1,25 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.gxradar">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Core Permissions -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
-
-    <!-- VPN Permission -->
     <uses-permission android:name="android.permission.BIND_VPN_SERVICE"/>
-
-    <!-- Storage (for discovery log) - maxSdkVersion for scoped storage compatibility -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="28"/>
-
-    <!-- Post Notifications for Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
     <application
@@ -32,7 +24,6 @@
         android:theme="@style/Theme.GXRadar"
         android:usesCleartextTraffic="true">
 
-        <!-- Main Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -44,7 +35,6 @@
             </intent-filter>
         </activity>
 
-        <!-- VPN Service -->
         <service
             android:name=".vpn.AlbionVpnService"
             android:permission="android.permission.BIND_VPN_SERVICE"
@@ -56,20 +46,12 @@
             <meta-data
                 android:name="android.net.VpnService"
                 android:resource="@xml/vpn_service_description"/>
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="network_capture"/>
         </service>
 
-        <!-- Overlay Service -->
         <service
             android:name=".overlay.RadarOverlayService"
             android:foregroundServiceType="specialUse"
-            android:exported="false">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="overlay"/>
-        </service>
+            android:exported="false"/>
 
     </application>
 
