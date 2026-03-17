@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App theme colors -->
+    <color name="colorPrimary">#2196F3</color>
+    <color name="colorPrimaryDark">#1976D2</color>
+    <color name="colorAccent">#4CAF50</color>
+
+    <!-- Background colors -->
+    <color name="backgroundDark">#121212</color>
+    <color name="surfaceDark">#1E1E1E</color>
+    <color name="cardDark">#2D2D2D</color>
+
+    <!-- Text colors -->
+    <color name="textPrimary">#FFFFFF</color>
+    <color name="textSecondary">#AAAAAA</color>
+
+    <!-- Status colors -->
+    <color name="statusRunning">#4CAF50</color>
+    <color name="statusStopped">#F44336</color>
+
+    <!-- Resource colors -->
+    <color name="resourceFiber">#4CAF50</color>
+    <color name="resourceOre">#9E9E9E</color>
+    <color name="resourceLogs">#8D6E63</color>
+    <color name="resourceRock">#78909C</color>
+    <color name="resourceHide">#A1887F</color>
+    <color name="resourceCrop">#FFEB3B</color>
+
+    <!-- Enchantment colors -->
+    <color name="enchant1">#4CAF50</color>
+    <color name="enchant2">#2196F3</color>
+    <color name="enchant3">#9C27B0</color>
+    <color name="enchant4">#FFD700</color>
+
+    <!-- Mob colors -->
+    <color name="mobNormal">#FF5722</color>
+    <color name="mobBoss">#F44336</color>
+    <color name="mobEnchanted">#9C27B0</color>
+
+    <!-- Player colors -->
+    <color name="playerFriendly">#4CAF50</color>
+    <color name="playerHostile">#F44336</color>
+    <color name="playerNeutral">#FFFFFF</color>
+
+    <!-- Object colors -->
+    <color name="silver">#C0C0C0</color>
+    <color name="chest">#FF9800</color>
+    <color name="dungeon">#9C27B0</color>
+    <color name="mist">#00BCD4</color>
+</resources>
