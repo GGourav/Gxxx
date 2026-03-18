@@ -73,9 +73,6 @@ class HarvestablesDatabase(private val context: Context) {
             data.forEach { (resourceType, entries) ->
                 harvestableTypes[resourceType] = mutableListOf()
                 
-                entries.forEach { (resourceType, entries) ->
-                harvestableTypes[resourceType] = mutableListOf()
-                
                 entries.forEach { entry ->
                     val tierEntry = TierEntry(
                         tier = entry.tier,
@@ -238,4 +235,4 @@ class HarvestablesDatabase(private val context: Context) {
         val startCharges: Int,
         val chargeUp: Double
     )
-    }
+}
