@@ -16,6 +16,8 @@ import java.nio.ByteOrder
  * - Added OperationResponse parsing (messageType 0x03)
  * - Fixed Move event position extraction (Little-Endian)
  * - Added proper ByteArray handling
+ * - Added support for SendReliable (type 3) and SendUnreliable (type 4)
+ * - Added detailed hex dump logging for debugging
  *
  * PHOTON HEADER (12 bytes, BIG-ENDIAN):
  *   [0–1]   PeerID       uint16  big-endian
@@ -25,7 +27,7 @@ import java.nio.ByteOrder
  *   [8–11]  Challenge    uint32  — skip
  *
  * COMMAND (repeats CmdCount times):
- *   [0]     CmdType      uint8   6=reliable, 7=unreliable
+ *   [0]     CmdType      uint8   6=reliable, 7=unreliable, 3=sendReliable, 4=sendUnreliable
  *   [1]     ChannelId    uint8   — parse ALL channels
  *   [2]     CmdFlags     uint8
  *   [3]     Reserved     uint8   — skip
@@ -43,15 +45,26 @@ class PhotonParser {
     companion object {
         private const val TAG = "PhotonParser"
 
+        // Enable verbose logging for debugging
+        private const val VERBOSE_LOGGING = true
+
         // Photon header constants
         private const val PHOTON_HEADER_SIZE = 12
         private const val COMMAND_HEADER_SIZE = 12
 
-        // Command types
-        private const val CMD_TYPE_RELIABLE = 6
-        private const val CMD_TYPE_UNRELIABLE = 7
+        // Command types - more complete list
+        private const val CMD_TYPE_ACK_ONLY = 0
+        private const val CMD_TYPE_CONNECT = 1
+        private const val CMD_TYPE_VERIFY_CONNECT = 2
+        private const val CMD_TYPE_DISCONNECT = 3
+        private const val CMD_TYPE_PING = 4
+        private const val CMD_TYPE_SEND_RELIABLE = 5
+        private const val CMD_TYPE_SEND_UNRELIABLE = 6
+        private const val CMD_TYPE_SEND_FRAGMENT = 7
+        private const val CMD_TYPE_RELIABLE = 6  // Alternative name
+        private const val CMD_TYPE_UNRELIABLE = 7  // Alternative name
 
-        // Message types
+        // Message types in payload
         private const val MSG_TYPE_OPERATION_REQUEST = 0x02.toByte()
         private const val MSG_TYPE_OPERATION_RESPONSE = 0x03.toByte()
         private const val MSG_TYPE_EVENT = 0x04.toByte()
@@ -84,7 +97,15 @@ class PhotonParser {
         val messages = mutableListOf<PhotonMessage>()
 
         if (payload.size < PHOTON_HEADER_SIZE) {
+            if (VERBOSE_LOGGING) {
+                Log.d(TAG, "Packet too small: ${payload.size} bytes (min: $PHOTON_HEADER_SIZE)")
+            }
             return messages
+        }
+
+        // Hex dump for debugging
+        if (VERBOSE_LOGGING) {
+            Log.d(TAG, "Raw packet (${payload.size} bytes): ${toHexDump(payload, 64)}")
         }
 
         val buffer = ByteBuffer.wrap(payload)
@@ -96,6 +117,10 @@ class PhotonParser {
             val flags = buffer.get().toInt() and 0xFF
             val cmdCount = buffer.get().toInt() and 0xFF
 
+            if (VERBOSE_LOGGING) {
+                Log.d(TAG, "Photon Header: peerId=$peerId, flags=$flags, cmdCount=$cmdCount")
+            }
+
             // Skip timestamp and challenge
             buffer.int // timestamp
             buffer.int // challenge
@@ -103,6 +128,7 @@ class PhotonParser {
             // Parse each command
             for (i in 0 until cmdCount) {
                 if (buffer.remaining() < COMMAND_HEADER_SIZE) {
+                    Log.w(TAG, "Not enough data for command header at cmd $i")
                     break
                 }
 
@@ -115,20 +141,43 @@ class PhotonParser {
                 buffer.get() // reserved
 
                 val cmdLength = buffer.int
-                buffer.int // reliable sequence
+                buffer.int // reliable sequence number
+
+                if (VERBOSE_LOGGING) {
+                    Log.d(TAG, "Cmd[$i]: type=$cmdType, channel=$channelId, flags=$cmdFlags, len=$cmdLength")
+                }
+
+                // Validate command length
+                if (cmdLength < COMMAND_HEADER_SIZE || cmdLength > 65535) {
+                    Log.w(TAG, "Invalid command length: $cmdLength")
+                    break
+                }
 
                 // Calculate payload length
                 val payloadLength = cmdLength - COMMAND_HEADER_SIZE
                 if (payloadLength <= 0 || buffer.remaining() < payloadLength) {
+                    if (VERBOSE_LOGGING) {
+                        Log.d(TAG, "Skipping cmd[$i]: payloadLen=$payloadLength, remaining=${buffer.remaining()}")
+                    }
                     buffer.position(cmdStartPos + cmdLength)
                     continue
                 }
 
-                // Only process reliable and unreliable commands
-                if (cmdType == CMD_TYPE_RELIABLE || cmdType == CMD_TYPE_UNRELIABLE) {
+                // Process commands that contain Photon messages
+                // Types 5, 6, 7 contain actual message payloads
+                if (cmdType == CMD_TYPE_SEND_RELIABLE || 
+                    cmdType == CMD_TYPE_SEND_UNRELIABLE || 
+                    cmdType == CMD_TYPE_RELIABLE ||
+                    cmdType == CMD_TYPE_UNRELIABLE ||
+                    cmdType == CMD_TYPE_SEND_FRAGMENT) {
+                    
                     // Extract payload
                     val cmdPayload = ByteArray(payloadLength)
                     buffer.get(cmdPayload)
+
+                    if (VERBOSE_LOGGING) {
+                        Log.d(TAG, "Cmd[$i] payload (${payloadLength} bytes): ${toHexDump(cmdPayload, 32)}")
+                    }
 
                     // Parse payload - handle all message types
                     val message = parsePayload(cmdPayload)
@@ -136,16 +185,34 @@ class PhotonParser {
                         messages.add(message)
                     }
                 } else {
-                    // Skip to next command
+                    // Skip to next command (ACK, PING, CONNECT, etc. have no messages)
+                    if (VERBOSE_LOGGING) {
+                        Log.d(TAG, "Cmd[$i]: type $cmdType has no message payload, skipping")
+                    }
                     buffer.position(cmdStartPos + cmdLength)
                 }
             }
 
         } catch (e: Exception) {
             Log.w(TAG, "Error parsing Photon packet: ${e.message}")
+            e.printStackTrace()
         }
 
         return messages
+    }
+
+    /**
+     * Create hex dump string for debugging
+     */
+    private fun toHexDump(data: ByteArray, maxBytes: Int = 64): String {
+        val len = minOf(data.size, maxBytes)
+        val sb = StringBuilder()
+        for (i in 0 until len) {
+            sb.append(String.format("%02X ", data[i]))
+            if ((i + 1) % 16 == 0) sb.append("\n")
+        }
+        if (data.size > maxBytes) sb.append("...")
+        return sb.toString().trim()
     }
 
     /**
@@ -162,12 +229,426 @@ class PhotonParser {
 
         val messageType = buffer.get()
 
+        if (VERBOSE_LOGGING) {
+            Log.d(TAG, "Message type: 0x${String.format("%02X", messageType)} (${messageType.toInt() and 0xFF})")
+        }
+
         return when (messageType) {
-            MSG_TYPE_EVENT -> parseEvent(buffer)
-            MSG_TYPE_OPERATION_REQUEST -> parseOperationRequest(buffer)
-            MSG_TYPE_OPERATION_RESPONSE -> parseOperationResponse(buffer)
+            MSG_TYPE_EVENT -> {
+                if (VERBOSE_LOGGING) Log.d(TAG, "Parsing Event message")
+                parseEvent(buffer)
+            }
+            MSG_TYPE_OPERATION_REQUEST -> {
+                if (VERBOSE_LOGGING) Log.d(TAG, "Parsing OperationRequest message")
+                parseOperationRequest(buffer)
+            }
+            MSG_TYPE_OPERATION_RESPONSE -> {
+                if (VERBOSE_LOGGING) Log.d(TAG, "Parsing OperationResponse message")
+                parseOperationResponse(buffer)
+            }
             else -> {
-                Log.d(TAG, "Unknown message type: 0x${String.format("%02X", messageType)}")
+                // Don't log 0x00 as unknown - these are often ACKs or keepalives
+                if (messageType != 0x00.toByte()) {
+                    Log.d(TAG, "Unknown message type: 0x${String.format("%02X", messageType)}")
+                }
+                null
+            }
+        }
+    }
+
+    /**
+     * Parse Event message (0x04)
+     */
+    private fun parseEvent(buffer: ByteBuffer): PhotonEvent? {
+        val eventCode = buffer.get().toInt() and 0xFF
+        val paramCount = buffer.short.toInt() and 0xFFFF
+
+        val params = HashMap<Int, Any?>()
+
+        for (i in 0 until paramCount) {
+            if (buffer.remaining() < 2) {
+                break
+            }
+
+            val key = buffer.get().toInt() and 0xFF
+            val value = parseValue(buffer)
+
+            params[key] = value
+        }
+
+        // CRITICAL: Extract positions for Move event (code 3)
+        // Positions are Little-Endian in ByteArray at key 1
+        if (eventCode == 3 && params[1] is ByteArray) {
+            val bytes = params[1] as ByteArray
+            if (bytes.size >= 17) {
+                // Extract Little-Endian floats at offsets 9 and 13
+                val leBuffer = ByteBuffer.wrap(bytes)
+                leBuffer.order(ByteOrder.LITTLE_ENDIAN)
+
+                leBuffer.position(9)
+                val posX = leBuffer.float
+                leBuffer.position(13)
+                val posY = leBuffer.float
+
+                params[4] = posX
+                params[5] = posY
+                params[252] = 3 // Event code marker
+            }
+        }
+
+        return PhotonEvent(eventCode, params)
+    }
+
+    /**
+     * Parse OperationRequest message (0x02)
+     * Used for local player movement (Operation 21)
+     */
+    private fun parseOperationRequest(buffer: ByteBuffer): PhotonRequest? {
+        val operationCode = buffer.get().toInt() and 0xFF
+        val paramCount = buffer.short.toInt() and 0xFFFF
+
+        val params = HashMap<Int, Any?>()
+
+        for (i in 0 until paramCount) {
+            if (buffer.remaining() < 2) {
+                break
+            }
+
+            val key = buffer.get().toInt() and 0xFF
+            val value = parseValue(buffer)
+
+            params[key] = value
+        }
+
+        // Mark message type
+        params[253] = operationCode
+
+        Log.d(TAG, "OperationRequest: code=$operationCode, params=${params.keys}")
+
+        return PhotonRequest(operationCode, params)
+    }
+
+    /**
+     * Parse OperationResponse message (0x03)
+     * Used for map changes (Operation 35) and join data (Operation 2)
+     */
+    private fun parseOperationResponse(buffer: ByteBuffer): PhotonResponse? {
+        val operationCode = buffer.get().toInt() and 0xFF
+        val returnCode = buffer.short.toInt() and 0xFFFF
+
+        // Debug message has inline type code
+        val debugMsgTypeCode = buffer.get().toInt() and 0xFF
+        val debugMessage = parseValue(buffer, debugMsgTypeCode.toByte())
+
+        val paramCount = buffer.short.toInt() and 0xFFFF
+
+        val params = HashMap<Int, Any?>()
+
+        for (i in 0 until paramCount) {
+            if (buffer.remaining() < 2) {
+                break
+            }
+
+            val key = buffer.get().toInt() and 0xFF
+            val value = parseValue(buffer)
+
+            params[key] = value
+        }
+
+        // Mark message type
+        params[253] = operationCode
+
+        // Extract position from JoinFinished (Operation 2)
+        if (operationCode == 2) {
+            // Position may be at key 9 as Buffer or Array
+            when (val posData = params[9]) {
+                is ByteArray -> {
+                    if (posData.size >= 8) {
+                        val leBuffer = ByteBuffer.wrap(posData)
+                        leBuffer.order(ByteOrder.LITTLE_ENDIAN)
+                        params[4] = leBuffer.float
+                        params[5] = leBuffer.getFloat(4)
+                    }
+                }
+                is List<*> -> {
+                    if (posData.size >= 2) {
+                        params[4] = (posData[0] as? Number)?.toFloat()
+                        params[5] = (posData[1] as? Number)?.toFloat()
+                    }
+                }
+            }
+        }
+
+        Log.d(TAG, "OperationResponse: code=$operationCode, return=$returnCode")
+
+        return PhotonResponse(operationCode, returnCode, debugMessage, params)
+    }
+
+    /**
+     * Parse a Photon-typed value from the buffer
+     */
+    private fun parseValue(buffer: ByteBuffer): Any? {
+        if (buffer.remaining() < 1) {
+            return null
+        }
+
+        val typeCode = buffer.get()
+        return parseValue(buffer, typeCode)
+    }
+
+    /**
+     * Parse a Photon-typed value with known type code
+     */
+    private fun parseValue(buffer: ByteBuffer, typeCode: Byte): Any? {
+        return when (typeCode) {
+            TYPE_NULL -> null
+
+            TYPE_BOOLEAN -> {
+                if (buffer.remaining() >= 1) {
+                    buffer.get().toInt() != 0
+                } else null
+            }
+
+            TYPE_BYTE -> {
+                if (buffer.remaining() >= 1) {
+                    buffer.get().toInt() and 0xFF
+                } else null
+            }
+
+            TYPE_SHORT -> {
+                if (buffer.remaining() >= 2) {
+                    buffer.short.toInt()
+                } else null
+            }
+
+            TYPE_INTEGER -> {
+                if (buffer.remaining() >= 4) {
+                    buffer.int
+                } else null
+            }
+
+            TYPE_LONG -> {
+                if (buffer.remaining() >= 8) {
+                    buffer.long
+                } else null
+            }
+
+            TYPE_FLOAT -> {
+                if (buffer.remaining() >= 4) {
+                    buffer.float
+                } else null
+            }
+
+            TYPE_DOUBLE -> {
+                if (buffer.remaining() >= 8) {
+                    buffer.double
+                } else null
+            }
+
+            TYPE_STRING -> {
+                if (buffer.remaining() >= 2) {
+                    val length = buffer.short.toInt() and 0xFFFF
+                    if (buffer.remaining() >= length) {
+                        val bytes = ByteArray(length)
+                        buffer.get(bytes)
+                        String(bytes, Charsets.UTF_8)
+                    } else null
+                } else null
+            }
+
+            TYPE_BYTE_ARRAY -> {
+                if (buffer.remaining() >= 4) {
+                    val length = buffer.int
+                    if (buffer.remaining() >= length && length >= 0 && length < 65536) {
+                        val bytes = ByteArray(length)
+                        buffer.get(bytes)
+                        bytes
+                    } else null
+                } else null
+            }
+
+            TYPE_INT_ARRAY -> {
+                if (buffer.remaining() >= 4) {
+                    val count = buffer.int
+                    if (count >= 0 && count < 65536) {
+                        val ints = IntArray(count)
+                        for (i in 0 until count) {
+                            if (buffer.remaining() >= 4) {
+                                ints[i] = buffer.int
+                            } else break
+                        }
+                        ints
+                    } else null
+                } else null
+            }
+
+            TYPE_ARRAY -> {
+                if (buffer.remaining() >= 3) {
+                    val length = buffer.short.toInt() and 0xFFFF
+                    val elemType = buffer.get()
+                    val items = ArrayList<Any?>(length)
+                    for (i in 0 until length) {
+                        // Push back the element type for recursive parsing
+                        buffer.position(buffer.position() - 1)
+                        items.add(parseValue(buffer))
+                    }
+                    items
+                } else null
+            }
+
+            TYPE_HASHTABLE -> {
+                if (buffer.remaining() >= 2) {
+                    val count = buffer.short.toInt() and 0xFFFF
+                    val map = HashMap<Any?, Any?>(count)
+                    for (i in 0 until count) {
+                        val key = parseValue(buffer)
+                        val value = parseValue(buffer)
+                        map[key] = value
+                    }
+                    map
+                } else null
+            }
+
+            TYPE_DICTIONARY -> {
+                if (buffer.remaining() >= 4) {
+                    val keyType = buffer.get()
+                    val valType = buffer.get()
+                    val count = buffer.short.toInt() and 0xFFFF
+                    val map = HashMap<Any?, Any?>(count)
+                    for (i in 0 until count) {
+                        val key = parseValue(buffer)
+                        val value = parseValue(buffer)
+                        map[key] = value
+                    }
+                    map
+                } else null
+            }
+
+            TYPE_OBJECT_ARRAY -> {
+                if (buffer.remaining() >= 2) {
+                    val length = buffer.short.toInt() and 0xFFFF
+                    val items = ArrayList<Any?>(length)
+                    for (i in 0 until length) {
+                        items.add(parseValue(buffer))
+                    }
+                    items
+                } else null
+            }
+
+            else -> {
+                Log.w(TAG, "Unknown Photon type code: 0x${String.format("%02X", typeCode)}")
+                null
+            }
+        }
+    }
+
+    // ==================== MESSAGE DATA CLASSES ====================
+
+    /**
+     * Base interface for all Photon messages
+     */
+    sealed class PhotonMessage {
+        abstract val params: Map<Int, Any?>
+    }
+
+    /**
+     * Event message (0x04)
+     */
+    data class PhotonEvent(
+        val eventCode: Map<Int, Any?>
+    }
+
+    /**
+     * Event message (0x04)
+     */
+    data class PhotonEvent(
+        val eventCode: Int,
+        override val params: Map<Int, Any?>
+    ) : PhotonMessage() {
+        /**
+         * Get entity ID (usually key 0)
+         */
+        fun getEntityId(): Int? = (params[0] as? Number)?.toInt()
+
+        /**
+         * Get position X (key 4 for Move, extracted from ByteArray)
+         */
+        fun getPosX(): Float? = (params[4] as? Number)?.toFloat()
+
+        /**
+         * Get position Y (key 5 for Move, extracted from ByteArray)
+         */
+        fun getPosY(): Float? = (params[5] as? Number)?.toFloat()
+    }
+
+    /**
+     * OperationRequest message (0x02)
+     */
+    data class PhotonRequest(
+        Log.d(TAG, "Cmd[$i]: type $cmdType has no message payload, skipping")
+                    }
+                    buffer.position(cmdStartPos + cmdLength)
+                }
+            }
+
+        } catch (e: Exception) {
+            Log.w(TAG, "Error parsing Photon packet: ${e.message}")
+            e.printStackTrace()
+        }
+
+        return messages
+    }
+
+    /**
+     * Create hex dump string for debugging
+     */
+    private fun toHexDump(data: ByteArray, maxBytes: Int = 64): String {
+        val len = minOf(data.size, maxBytes)
+        val sb = StringBuilder()
+        for (i in 0 until len) {
+            sb.append(String.format("%02X ", data[i]))
+            if ((i + 1) % 16 == 0) sb.append("\n")
+        }
+        if (data.size > maxBytes) sb.append("...")
+        return sb.toString().trim()
+    }
+
+    /**
+     * Parse a command payload and extract message data
+     * Handles Event (0x04), OperationRequest (0x02), OperationResponse (0x03)
+     */
+    private fun parsePayload(payload: ByteArray): PhotonMessage? {
+        if (payload.isEmpty()) {
+            return null
+        }
+
+        val buffer = ByteBuffer.wrap(payload)
+        buffer.order(ByteOrder.BIG_ENDIAN)
+
+        val messageType = buffer.get()
+
+        if (VERBOSE_LOGGING) {
+            Log.d(TAG, "Message type: 0x${String.format("%02X", messageType)} (${messageType.toInt() and 0xFF})")
+        }
+
+        return when (messageType) {
+            MSG_TYPE_EVENT -> {
+                if (VERBOSE_LOGGING) Log.d(TAG, "Parsing Event message")
+                parseEvent(buffer)
+            }
+            MSG_TYPE_OPERATION_REQUEST -> {
+                if (VERBOSE_LOGGING) Log.d(TAG, "Parsing OperationRequest message")
+                parseOperationRequest(buffer)
+            }
+            MSG_TYPE_OPERATION_RESPONSE -> {
+                if (VERBOSE_LOGGING) Log.d(TAG, "Parsing OperationResponse message")
+                parseOperationResponse(buffer)
+            }
+            else -> {
+                // Don't log 0x00 as unknown - these are often ACKs or keepalives
+                if (messageType != 0x00.toByte()) {
+                    Log.d(TAG, "Unknown message type: 0x${String.format("%02X", messageType)}")
+                }
                 null
             }
         }
