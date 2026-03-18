@@ -28,44 +28,27 @@ import kotlinx.coroutines.flow.collectLatest
 
 /**
  * Radar Overlay Service
- *
- * Manages the floating window overlay that displays the radar.
- * Uses WindowManager to create a transparent overlay on top of other apps.
- *
- * Features:
- * - Foreground service for background operation
- * - WindowManager overlay configuration
- * - Reactive entity updates from EventDispatcher
- * - 30 FPS render loop
  */
 class RadarOverlayService : LifecycleService() {
 
     companion object {
         private const val TAG = "RadarOverlayService"
 
-        // Service actions
         const val ACTION_START = "com.gxradar.overlay.START"
         const val ACTION_STOP = "com.gxradar.overlay.STOP"
 
-        // Notification
         private const val NOTIFICATION_CHANNEL_ID = "gxradar_overlay_channel"
         private const val NOTIFICATION_ID = 1002
     }
 
-    // Window manager
     private lateinit var windowManager: WindowManager
 
-    // Overlay views
     private var overlayView: View? = null
     private var radarSurfaceView: RadarSurfaceView? = null
 
-    // Layout params
     private lateinit var layoutParams: WindowManager.LayoutParams
 
-    // Render job
     private var renderJob: Job? = null
-
-    // Entity observation job
     private var entityObserverJob: Job? = null
 
     override fun onCreate() {
@@ -107,40 +90,25 @@ class RadarOverlayService : LifecycleService() {
         super.onDestroy()
     }
 
-    /**
-     * Start the overlay
-     */
     private fun startOverlay() {
         Log.i(TAG, "Starting overlay...")
 
-        // Start as foreground service
         startForeground(NOTIFICATION_ID, createNotification())
-
-        // Create overlay view
         createOverlayView()
-
-        // Start render loop
         startRenderLoop()
-
-        // Start observing entities from EventDispatcher
         startEntityObserver()
 
         Log.i(TAG, "Overlay started")
     }
 
-    /**
-     * Stop the overlay
-     */
     private fun stopOverlay() {
         Log.i(TAG, "Stopping overlay...")
 
-        // Cancel jobs
         renderJob?.cancel()
         entityObserverJob?.cancel()
         renderJob = null
         entityObserverJob = null
 
-        // Remove overlay view
         overlayView?.let {
             try {
                 windowManager.removeView(it)
@@ -154,15 +122,10 @@ class RadarOverlayService : LifecycleService() {
         Log.i(TAG, "Overlay stopped")
     }
 
-    /**
-     * Create the overlay view
-     */
     private fun createOverlayView() {
-        // Get radar size from preferences
         val prefs = MainApplication.getInstance().sharedPreferences
         val radarSize = prefs.getInt(MainApplication.KEY_RADAR_SIZE, MainApplication.DEFAULT_RADAR_SIZE)
 
-        // Initialize layout params
         layoutParams = WindowManager.LayoutParams(
             radarSize,
             radarSize,
@@ -182,10 +145,8 @@ class RadarOverlayService : LifecycleService() {
             y = prefs.getInt(MainApplication.KEY_RADAR_Y, 100)
         }
 
-        // Create surface view for radar rendering
         radarSurfaceView = RadarSurfaceView(this)
 
-        // Add view to window
         try {
             windowManager.addView(radarSurfaceView, layoutParams)
             overlayView = radarSurfaceView
@@ -194,53 +155,43 @@ class RadarOverlayService : LifecycleService() {
         }
     }
 
-    /**
-     * Start the render loop (30 FPS)
-     */
     private fun startRenderLoop() {
         renderJob = lifecycleScope.launch {
             while (isActive) {
                 radarSurfaceView?.requestRender()
-                delay(33) // ~30 FPS
+                delay(33)
             }
         }
     }
 
-    /**
-     * Start observing entities from EventDispatcher
-     */
     private fun startEntityObserver() {
         entityObserverJob = lifecycleScope.launch {
             // Wait for EventDispatcher to be available
             var retryCount = 0
             while (retryCount < 50) {
-                try {
-                    val app = MainApplication.getInstance()
-                    if (app::eventDispatcher.isInitialized) {
-                        break
-                    }
-                } catch (e: Exception) {
-                    // Not ready yet
+                if (MainApplication.getInstance().isEventDispatcherInitialized()) {
+                    break
                 }
                 delay(100)
                 retryCount++
             }
 
+            if (!MainApplication.getInstance().isEventDispatcherInitialized()) {
+                Log.e(TAG, "EventDispatcher not initialized after timeout")
+                return@launch
+            }
+
             try {
                 val eventDispatcher = MainApplication.getInstance().eventDispatcher
 
-                // Observe entity flow
                 eventDispatcher.entities.collectLatest { entityMap ->
                     withContext(Dispatchers.Main) {
-                        // Update radar view with new entities
                         radarSurfaceView?.updateEntities(entityMap)
 
-                        // Update local player position
                         val localX = MainApplication.getInstance().getLocalPlayerX()
                         val localY = MainApplication.getInstance().getLocalPlayerY()
                         radarSurfaceView?.updateLocalPosition(localX, localY)
 
-                        // Log entity count periodically
                         if (entityMap.isNotEmpty() && entityMap.size % 10 == 0) {
                             Log.d(TAG, "Entities updated: ${entityMap.size}")
                         }
@@ -251,7 +202,6 @@ class RadarOverlayService : LifecycleService() {
             }
         }
 
-        // Also start periodic position update (fallback)
         lifecycleScope.launch {
             while (isActive) {
                 delay(100)
@@ -260,9 +210,6 @@ class RadarOverlayService : LifecycleService() {
         }
     }
 
-    /**
-     * Update local player position from MainApplication
-     */
     private suspend fun updateLocalPosition() {
         withContext(Dispatchers.Main) {
             val localX = MainApplication.getInstance().getLocalPlayerX()
@@ -271,16 +218,10 @@ class RadarOverlayService : LifecycleService() {
         }
     }
 
-    /**
-     * Update entities in the radar view (manual update)
-     */
     fun updateRadarEntities(entities: Map<Int, RadarEntity>) {
         radarSurfaceView?.updateEntities(entities)
     }
 
-    /**
-     * Create notification channel
-     */
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -297,9 +238,6 @@ class RadarOverlayService : LifecycleService() {
         }
     }
 
-    /**
-     * Create foreground notification
-     */
     private fun createNotification(): Notification {
         val pendingIntent = PendingIntent.getActivity(
             this,
