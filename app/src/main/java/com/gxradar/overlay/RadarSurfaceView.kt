@@ -8,8 +8,6 @@ import android.view.SurfaceView
 import com.gxradar.MainApplication
 import com.gxradar.model.EntityType
 import com.gxradar.model.RadarEntity
-import kotlin.math.cos
-import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
@@ -18,13 +16,11 @@ import kotlin.math.sqrt
  * Renders the radar overlay at 30 FPS using SurfaceView canvas.
  * Draws entities as colored dots centered on the local player's world position.
  *
- * Rendering Rules:
- * - Resources: Filled circles with alpha scaling by tier
- * - Enchantments: Outer rings in different colors
- * - Mobs: Filled circles (different colors for normal/boss)
- * - Players: Colored circles based on faction
- * - Chests/Dungeons: Squares with rarity colors
- * - Mists: Special shapes
+ * Entity Types (removed Crop - not useful for radar):
+ * - Resources: FIBER, ORE, LOGS, ROCK, HIDE (T1-T8, enchant 0-4)
+ * - Mobs: NORMAL, ENCHANTED, BOSS, MIST_BOSS
+ * - Players: PLAYER, FRIENDLY, HOSTILE, NEUTRAL
+ * - Objects: SILVER, CHEST, DUNGEON_PORTAL, MIST_WISP
  */
 class RadarSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
 
@@ -69,13 +65,13 @@ class RadarSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.C
         isAntiAlias = true
     }
 
-    // Entity colors
+    // Entity colors (removed Crop - using for Fishing zones instead)
     private val colorFiber = Color.parseColor("#4CAF50")      // Green
     private val colorOre = Color.parseColor("#9E9E9E")        // Gray
     private val colorLogs = Color.parseColor("#8D6E63")       // Brown
     private val colorRock = Color.parseColor("#78909C")       // Blue-gray
     private val colorHide = Color.parseColor("#A1887F")       // Tan
-    private val colorCrop = Color.parseColor("#FFEB3B")       // Yellow
+    private val colorFishing = Color.parseColor("#00BCD4")    // Cyan (was Crop)
 
     private val colorEnchant1 = Color.parseColor("#4CAF50")   // Green
     private val colorEnchant2 = Color.parseColor("#2196F3")   // Blue
@@ -168,7 +164,6 @@ class RadarSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.C
         // Draw entities
         val prefs = MainApplication.getInstance().sharedPreferences
         val scale = prefs.getInt(MainApplication.KEY_RADAR_SCALE, MainApplication.DEFAULT_RADAR_SCALE) / 100f
-        val range = radarRadius / scale // World units per pixel
 
         entities.values.forEach { entity ->
             // Calculate screen position
@@ -204,7 +199,6 @@ class RadarSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.C
             EntityType.RESOURCE_LOGS -> prefs.getBoolean(MainApplication.KEY_HARVESTING_WOOD, true)
             EntityType.RESOURCE_ROCK -> prefs.getBoolean(MainApplication.KEY_HARVESTING_ROCK, true)
             EntityType.RESOURCE_HIDE -> prefs.getBoolean(MainApplication.KEY_HARVESTING_HIDE, true)
-            EntityType.RESOURCE_CROP -> prefs.getBoolean(MainApplication.KEY_HARVESTING_FISHING, true)
             EntityType.NORMAL_MOB -> prefs.getBoolean(MainApplication.KEY_MOB_ENEMY, true)
             EntityType.ENCHANTED_MOB -> prefs.getBoolean(MainApplication.KEY_MOB_ENEMY, true)
             EntityType.BOSS_MOB -> prefs.getBoolean(MainApplication.KEY_MOB_BOSS, true)
@@ -266,7 +260,6 @@ class RadarSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.C
             EntityType.RESOURCE_LOGS -> colorLogs
             EntityType.RESOURCE_ROCK -> colorRock
             EntityType.RESOURCE_HIDE -> colorHide
-            EntityType.RESOURCE_CROP -> colorCrop
             EntityType.NORMAL_MOB -> colorMobNormal
             EntityType.ENCHANTED_MOB -> colorMobEnchanted
             EntityType.BOSS_MOB, EntityType.MIST_BOSS -> colorMobBoss
