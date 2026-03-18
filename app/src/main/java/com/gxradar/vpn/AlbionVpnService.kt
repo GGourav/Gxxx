@@ -564,13 +564,25 @@ class AlbionVpnService : VpnService() {
      */
     private fun parsePhotonPacket(payload: ByteArray) {
         try {
+            // Log raw packet details before parsing
+            if (payload.isNotEmpty()) {
+                Log.d(TAG, "Parsing packet: ${payload.size} bytes, first bytes: ${
+                    payload.take(16).joinToString(" ") { String.format("%02X", it) }
+                }")
+            }
+
             val events = photonParser.parse(payload)
+
+            if (events.isNotEmpty()) {
+                Log.i(TAG, "Parsed ${events.size} Photon messages")
+            }
 
             events.forEach { event ->
                 eventDispatcher.dispatchEvent(event)
             }
         } catch (e: Exception) {
             Log.w(TAG, "Error parsing Photon packet: ${e.message}")
+            e.printStackTrace()
         }
     }
 
