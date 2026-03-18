@@ -372,8 +372,14 @@ class EventDispatcher(private val context: Context) {
         val size = (params[10] as? Number)?.toInt() ?: 0
         val mobileTypeId = (params[6] as? Number)?.toInt() // For living resources
 
-        val posX = location?.get(0) as? Number?.toFloat()
-        val posY = location?.get(1) as? Number?.toFloat()
+        // Safe extraction of position
+        var posX: Float? = null
+        var posY: Float? = null
+        
+        if (location != null && location.size >= 2) {
+            posX = (location[0] as? Number)?.toFloat()
+            posY = (location[1] as? Number)?.toFloat()
+        }
 
         if (posX != null && posY != null) {
             addHarvestable(id, type, tier, posX, posY, enchant, size, mobileTypeId)
@@ -474,8 +480,13 @@ class EventDispatcher(private val context: Context) {
 
         // Get position
         val location = (params[7] as? List<*>)
-        var posX = location?.get(0) as? Number?.toFloat()
-        var posY = location?.get(1) as? Number?.toFloat()
+        var posX: Float? = null
+        var posY: Float? = null
+        
+        if (location != null && location.size >= 2) {
+            posX = (location[0] as? Number)?.toFloat()
+            posY = (location[1] as? Number)?.toFloat()
+        }
 
         if (posX == null || posY == null) {
             val coords = findCoordinates(params)
@@ -492,31 +503,33 @@ class EventDispatcher(private val context: Context) {
         val isHarvestable = mobsDatabase?.isHarvestable(typeId) ?: false
 
         // Determine entity type
-        val (entityType, typeName) = when {
-            isHarvestable -> {
-                val resourceType = mobInfo?.resourceType ?: "UNKNOWN"
-                val et = when (resourceType) {
-                    "Hide" -> EntityType.RESOURCE_HIDE
-                    "Fiber" -> EntityType.RESOURCE_FIBER
-                    "Log" -> EntityType.RESOURCE_LOGS
-                    "Rock" -> EntityType.RESOURCE_ROCK
-                    "Ore" -> EntityType.RESOURCE_ORE
-                    else -> EntityType.NORMAL_MOB
-                }
-                Pair(et, resourceType)
+        val entityType: EntityType
+        val typeName: String
+        
+        if (isHarvestable) {
+            val resourceType = mobInfo?.resourceType ?: "UNKNOWN"
+            entityType = when (resourceType) {
+                "Hide" -> EntityType.RESOURCE_HIDE
+                "Fiber" -> EntityType.RESOURCE_FIBER
+                "Log" -> EntityType.RESOURCE_LOGS
+                "Rock" -> EntityType.RESOURCE_ROCK
+                "Ore" -> EntityType.RESOURCE_ORE
+                else -> EntityType.NORMAL_MOB
             }
-            mobInfo != null -> {
-                // Hostile mob - check category
-                val et = when {
-                    mobInfo.category.equals("boss", ignoreCase = true) -> EntityType.BOSS_MOB
-                    mobInfo.category.contains("boss", ignoreCase = true) -> EntityType.BOSS_MOB
-                    mobInfo.category.equals("miniboss", ignoreCase = true) -> EntityType.BOSS_MOB
-                    mobInfo.category.equals("champion", ignoreCase = true) -> EntityType.ENCHANTED_MOB
-                    else -> EntityType.NORMAL_MOB
-                }
-                Pair(et, mobInfo.uniqueName)
+            typeName = resourceType
+        } else if (mobInfo != null) {
+            // Hostile mob - check category
+            entityType = when {
+                mobInfo.category.equals("boss", ignoreCase = true) -> EntityType.BOSS_MOB
+                mobInfo.category.contains("boss", ignoreCase = true) -> EntityType.BOSS_MOB
+                mobInfo.category.equals("miniboss", ignoreCase = true) -> EntityType.BOSS_MOB
+                mobInfo.category.equals("champion", ignoreCase = true) -> EntityType.ENCHANTED_MOB
+                else -> EntityType.NORMAL_MOB
             }
-            else -> Pair(EntityType.NORMAL_MOB, "MOB_$typeId")
+            typeName = mobInfo.uniqueName
+        } else {
+            entityType = EntityType.NORMAL_MOB
+            typeName = "MOB_$typeId"
         }
 
         val tier = mobInfo?.tier ?: 0
