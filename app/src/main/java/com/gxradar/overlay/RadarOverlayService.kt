@@ -212,28 +212,42 @@ class RadarOverlayService : LifecycleService() {
     private fun startEntityObserver() {
         entityObserverJob = lifecycleScope.launch {
             // Wait for EventDispatcher to be available
-            while (!::MainApplication.getInstance().eventDispatcher.isInitialized) {
+            var retryCount = 0
+            while (retryCount < 50) {
+                try {
+                    val app = MainApplication.getInstance()
+                    if (app::eventDispatcher.isInitialized) {
+                        break
+                    }
+                } catch (e: Exception) {
+                    // Not ready yet
+                }
                 delay(100)
+                retryCount++
             }
 
-            val eventDispatcher = MainApplication.getInstance().eventDispatcher
+            try {
+                val eventDispatcher = MainApplication.getInstance().eventDispatcher
 
-            // Observe entity flow
-            eventDispatcher.entities.collectLatest { entityMap ->
-                withContext(Dispatchers.Main) {
-                    // Update radar view with new entities
-                    radarSurfaceView?.updateEntities(entityMap)
+                // Observe entity flow
+                eventDispatcher.entities.collectLatest { entityMap ->
+                    withContext(Dispatchers.Main) {
+                        // Update radar view with new entities
+                        radarSurfaceView?.updateEntities(entityMap)
 
-                    // Update local player position
-                    val localX = MainApplication.getInstance().getLocalPlayerX()
-                    val localY = MainApplication.getInstance().getLocalPlayerY()
-                    radarSurfaceView?.updateLocalPosition(localX, localY)
+                        // Update local player position
+                        val localX = MainApplication.getInstance().getLocalPlayerX()
+                        val localY = MainApplication.getInstance().getLocalPlayerY()
+                        radarSurfaceView?.updateLocalPosition(localX, localY)
 
-                    // Log entity count periodically
-                    if (entityMap.isNotEmpty() && entityMap.size % 10 == 0) {
-                        Log.d(TAG, "Entities updated: ${entityMap.size}")
+                        // Log entity count periodically
+                        if (entityMap.isNotEmpty() && entityMap.size % 10 == 0) {
+                            Log.d(TAG, "Entities updated: ${entityMap.size}")
+                        }
                     }
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in entity observer: ${e.message}")
             }
         }
 
