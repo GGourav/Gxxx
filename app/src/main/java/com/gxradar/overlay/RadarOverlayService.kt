@@ -11,7 +11,6 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import android.view.Gravity
-import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
 import androidx.lifecycle.LifecycleService
@@ -25,6 +24,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.collectLatest
 
 /**
  * Radar Overlay Service
@@ -35,8 +35,8 @@ import kotlinx.coroutines.withContext
  * Features:
  * - Foreground service for background operation
  * - WindowManager overlay configuration
- * - Drag-to-move functionality
- * - Settings wheel access
+ * - Reactive entity updates from EventDispatcher
+ * - 30 FPS render loop
  */
 class RadarOverlayService : LifecycleService() {
 
@@ -65,8 +65,8 @@ class RadarOverlayService : LifecycleService() {
     // Render job
     private var renderJob: Job? = null
 
-    // Entity update job
-    private var entityUpdateJob: Job? = null
+    // Entity observation job
+    private var entityObserverJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -122,8 +122,8 @@ class RadarOverlayService : LifecycleService() {
         // Start render loop
         startRenderLoop()
 
-        // Start entity update loop
-        startEntityUpdateLoop()
+        // Start observing entities from EventDispatcher
+        startEntityObserver()
 
         Log.i(TAG, "Overlay started")
     }
@@ -136,9 +136,9 @@ class RadarOverlayService : LifecycleService() {
 
         // Cancel jobs
         renderJob?.cancel()
-        entityUpdateJob?.cancel()
+        entityObserverJob?.cancel()
         renderJob = null
-        entityUpdateJob = null
+        entityObserverJob = null
 
         // Remove overlay view
         overlayView?.let {
@@ -207,33 +207,58 @@ class RadarOverlayService : LifecycleService() {
     }
 
     /**
-     * Start the entity update loop
+     * Start observing entities from EventDispatcher
      */
-    private fun startEntityUpdateLoop() {
-        entityUpdateJob = lifecycleScope.launch {
+    private fun startEntityObserver() {
+        entityObserverJob = lifecycleScope.launch {
+            // Wait for EventDispatcher to be available
+            while (!::MainApplication.getInstance().eventDispatcher.isInitialized) {
+                delay(100)
+            }
+
+            val eventDispatcher = MainApplication.getInstance().eventDispatcher
+
+            // Observe entity flow
+            eventDispatcher.entities.collectLatest { entityMap ->
+                withContext(Dispatchers.Main) {
+                    // Update radar view with new entities
+                    radarSurfaceView?.updateEntities(entityMap)
+
+                    // Update local player position
+                    val localX = MainApplication.getInstance().getLocalPlayerX()
+                    val localY = MainApplication.getInstance().getLocalPlayerY()
+                    radarSurfaceView?.updateLocalPosition(localX, localY)
+
+                    // Log entity count periodically
+                    if (entityMap.isNotEmpty() && entityMap.size % 10 == 0) {
+                        Log.d(TAG, "Entities updated: ${entityMap.size}")
+                    }
+                }
+            }
+        }
+
+        // Also start periodic position update (fallback)
+        lifecycleScope.launch {
             while (isActive) {
-                updateEntities()
-                delay(100) // Update entities every 100ms
+                delay(100)
+                updateLocalPosition()
             }
         }
     }
 
     /**
-     * Update entities from VPN service
+     * Update local player position from MainApplication
      */
-    private suspend fun updateEntities() {
+    private suspend fun updateLocalPosition() {
         withContext(Dispatchers.Main) {
-            // Get local player position
             val localX = MainApplication.getInstance().getLocalPlayerX()
             val localY = MainApplication.getInstance().getLocalPlayerY()
-
-            // Update radar view
             radarSurfaceView?.updateLocalPosition(localX, localY)
         }
     }
 
     /**
-     * Update entities in the radar view
+     * Update entities in the radar view (manual update)
      */
     fun updateRadarEntities(entities: Map<Int, RadarEntity>) {
         radarSurfaceView?.updateEntities(entities)
