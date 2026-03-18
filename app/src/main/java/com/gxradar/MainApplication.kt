@@ -13,9 +13,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
-/**
- * Main Application class for GX Radar.
- */
 class MainApplication : MultiDexApplication() {
 
     companion object {
@@ -30,96 +27,59 @@ class MainApplication : MultiDexApplication() {
 
         const val PREFS_NAME = "gxradar_prefs"
 
-        // Player preferences
         const val KEY_PLAYER_DOT = "playerDot"
-        const val KEY_PLAYER_NICKNAME = "playerNickname"
-        const val KEY_PLAYER_HEALTH = "playerHealth"
-        const val KEY_PLAYER_MOUNTED = "playerMounted"
-        const val KEY_PLAYER_DISTANCE = "playerDistance"
-        const val KEY_PLAYER_GUILD_NAME = "playerGuildName"
-        const val KEY_PLAYER_SOUND = "playerSound"
-        const val KEY_PLAYER_ALLIED_GUILDS = "playerAlliedGuilds"
-
-        // Radar display preferences
         const val KEY_RADAR_X = "radarXBar"
         const val KEY_RADAR_Y = "radarYBar"
         const val KEY_RADAR_SIZE = "radarSizeWidthHeightBar"
         const val KEY_RADAR_SCALE = "radarScaleBar"
         const val KEY_RADAR_SHOW_CIRCLE = "radarShowCircle"
-        const val KEY_RADAR_SHOW_SQUARE = "radarShowSquare"
-        const val KEY_RADAR_SHOW_TOP_MOST = "radarShowTopMost"
 
-        // Harvesting preferences
         const val KEY_HARVESTING_FIBER = "harvestingFiber"
         const val KEY_HARVESTING_HIDE = "harvestingHide"
         const val KEY_HARVESTING_ORE = "harvestingOre"
         const val KEY_HARVESTING_ROCK = "harvestingRock"
         const val KEY_HARVESTING_WOOD = "harvestingWood"
-        const val KEY_HARVESTING_FISHING = "harvestingZoneFishing"
-        const val KEY_HARVESTING_SIZE = "harvestingSize"
-        const val KEY_HARVESTING_WIDTH_HEIGHT = "harvestingWidthHeightBar"
 
-        // Mob preferences
         const val KEY_MOB_HARVESTABLE = "mobHarvestable"
-        const val KEY_MOB_SKINNABLE = "mobSkinnable"
         const val KEY_MOB_ENEMY = "mobEnemy"
         const val KEY_MOB_BOSS = "mobBoss"
         const val KEY_MOB_MIST_BOSS = "mobMistBoss"
-        const val KEY_MOB_OTHER = "mobOther"
 
-        // Chest preferences
         const val KEY_CHEST = "chest"
-        const val KEY_CHEST_STANDARD = "chestStandard"
-        const val KEY_CHEST_UNCOMMON = "chestUncommon"
-        const val KEY_CHEST_RARE = "chestRare"
-        const val KEY_CHEST_LEGENDARY = "chestLegendary"
-
-        // Dungeon preferences
         const val KEY_DUNGEON = "dungeon"
-        const val KEY_DUNGEON_COMMON = "dungeonCommon"
-        const val KEY_DUNGEON_UNCOMMON = "dungeonUncommon"
-        const val KEY_DUNGEON_RARE = "dungeonRare"
-        const val KEY_DUNGEON_EPIC = "dungeonEpic"
-        const val KEY_DUNGEON_LEGENDARY = "dungeonLegendary"
-
-        // Mist preferences
         const val KEY_MIST = "mist"
-        const val KEY_MIST_PORTAL = "mistPortal"
-        const val KEY_MIST_WISP = "mistWisp"
 
-        // VPN state preferences
         const val KEY_VPN_RUNNING = "vpnRunningStatus"
-        const val KEY_VPN_START_TIME = "vpnStartTime"
         const val KEY_LOCAL_PLAYER_ID = "localPlayerId"
         const val KEY_LOCAL_PLAYER_X = "localPlayerX"
         const val KEY_LOCAL_PLAYER_Y = "localPlayerY"
 
-        // Default values
         const val DEFAULT_RADAR_SIZE = 300
         const val DEFAULT_RADAR_SCALE = 50
     }
 
-    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     lateinit var sharedPreferences: SharedPreferences
         private set
 
-    lateinit var idMapRepository: IdMapRepository
-        private set
+    private var _idMapRepository: IdMapRepository? = null
+    val idMapRepository: IdMapRepository
+        get() = _idMapRepository ?: throw IllegalStateException("IdMapRepository not initialized")
 
-    lateinit var mobsDatabase: MobsDatabase
-        private set
+    private var _mobsDatabase: MobsDatabase? = null
+    val mobsDatabase: MobsDatabase
+        get() = _mobsDatabase ?: throw IllegalStateException("MobsDatabase not initialized")
 
-    lateinit var harvestablesDatabase: HarvestablesDatabase
-        private set
+    private var _harvestablesDatabase: HarvestablesDatabase? = null
+    val harvestablesDatabase: HarvestablesDatabase
+        get() = _harvestablesDatabase ?: throw IllegalStateException("HarvestablesDatabase not initialized")
 
-    lateinit var eventDispatcher: EventDispatcher
-        private set
+    private var _eventDispatcher: EventDispatcher? = null
+    val eventDispatcher: EventDispatcher
+        get() = _eventDispatcher ?: throw IllegalStateException("EventDispatcher not initialized")
 
-    // Flag to track if eventDispatcher is initialized
-    private var _eventDispatcherInitialized = false
-    
-    fun isEventDispatcherInitialized(): Boolean = _eventDispatcherInitialized
+    fun isEventDispatcherInitialized(): Boolean = _eventDispatcher != null
 
     @Volatile
     var databasesLoaded = false
@@ -127,117 +87,109 @@ class MainApplication : MultiDexApplication() {
 
     override fun onCreate() {
         super.onCreate()
+        Log.i(TAG, "Application onCreate started")
 
-        sharedPreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        initializeDefaultPreferences()
+        try {
+            // CRITICAL: Set instance FIRST before any other initialization
+            instance = this
+            Log.i(TAG, "Instance set")
 
-        idMapRepository = IdMapRepository(this)
-        mobsDatabase = MobsDatabase(this)
-        harvestablesDatabase = HarvestablesDatabase(this)
-        eventDispatcher = EventDispatcher(this)
-        _eventDispatcherInitialized = true
+            sharedPreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            initializeDefaultPreferences()
 
-        instance = this
+            // Initialize repositories
+            _idMapRepository = IdMapRepository(this)
+            _mobsDatabase = MobsDatabase(this)
+            _harvestablesDatabase = HarvestablesDatabase(this)
+            
+            // Now it's safe to create EventDispatcher since instance is set
+            _eventDispatcher = EventDispatcher(this)
 
-        applicationScope.launch {
-            loadDatabases()
+            Log.i(TAG, "Basic initialization complete")
+
+            // Load databases asynchronously
+            applicationScope.launch {
+                loadDatabases()
+            }
+
+            Log.i(TAG, "Application initialized successfully")
+
+        } catch (e: Exception) {
+            Log.e(TAG, "CRITICAL: Application initialization failed", e)
         }
-
-        Log.i(TAG, "Application initialized")
     }
 
     private suspend fun loadDatabases() {
-        Log.i(TAG, "Loading databases...")
+        try {
+            Log.i(TAG, "Loading databases...")
 
-        idMapRepository.loadIdMap()
-        mobsDatabase.load()
-        harvestablesDatabase.load()
-        eventDispatcher.setDatabases(mobsDatabase, harvestablesDatabase)
+            idMapRepository.loadIdMap()
+            Log.i(TAG, "ID map loaded")
 
-        databasesLoaded = mobsDatabase.isLoaded && harvestablesDatabase.isLoaded
+            mobsDatabase.load()
+            Log.i(TAG, "Mobs database loaded")
 
-        Log.i(TAG, "Databases loaded: mobs=${mobsDatabase.isLoaded}, harvestables=${harvestablesDatabase.isLoaded}")
+            harvestablesDatabase.load()
+            Log.i(TAG, "Harvestables database loaded")
+
+            eventDispatcher.setDatabases(mobsDatabase, harvestablesDatabase)
+            Log.i(TAG, "EventDispatcher configured")
+
+            databasesLoaded = mobsDatabase.isLoaded && harvestablesDatabase.isLoaded
+
+            Log.i(TAG, "Databases loaded: mobs=${mobsDatabase.isLoaded}, harvestables=${harvestablesDatabase.isLoaded}")
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load databases", e)
+            databasesLoaded = false
+        }
     }
 
     private fun initializeDefaultPreferences() {
-        val editor = sharedPreferences.edit()
+        try {
+            val editor = sharedPreferences.edit()
 
-        if (!sharedPreferences.contains(KEY_PLAYER_DOT)) {
-            editor.putBoolean(KEY_PLAYER_DOT, true)
-        }
-
-        if (!sharedPreferences.contains(KEY_RADAR_SIZE)) {
-            editor.putInt(KEY_RADAR_SIZE, DEFAULT_RADAR_SIZE)
-        }
-        if (!sharedPreferences.contains(KEY_RADAR_SCALE)) {
-            editor.putInt(KEY_RADAR_SCALE, DEFAULT_RADAR_SCALE)
-        }
-        if (!sharedPreferences.contains(KEY_RADAR_SHOW_CIRCLE)) {
-            editor.putBoolean(KEY_RADAR_SHOW_CIRCLE, true)
-        }
-
-        val harvestingKeys = listOf(
-            KEY_HARVESTING_FIBER, KEY_HARVESTING_HIDE, KEY_HARVESTING_ORE,
-            KEY_HARVESTING_ROCK, KEY_HARVESTING_WOOD
-        )
-        harvestingKeys.forEach { key ->
-            if (!sharedPreferences.contains(key)) {
-                editor.putBoolean(key, true)
+            if (!sharedPreferences.contains(KEY_PLAYER_DOT)) {
+                editor.putBoolean(KEY_PLAYER_DOT, true)
             }
-        }
-
-        val mobKeys = listOf(
-            KEY_MOB_HARVESTABLE, KEY_MOB_SKINNABLE, KEY_MOB_ENEMY,
-            KEY_MOB_BOSS, KEY_MOB_MIST_BOSS, KEY_MOB_OTHER
-        )
-        mobKeys.forEach { key ->
-            if (!sharedPreferences.contains(key)) {
-                editor.putBoolean(key, true)
+            if (!sharedPreferences.contains(KEY_RADAR_SIZE)) {
+                editor.putInt(KEY_RADAR_SIZE, DEFAULT_RADAR_SIZE)
             }
+            if (!sharedPreferences.contains(KEY_RADAR_SCALE)) {
+                editor.putInt(KEY_RADAR_SCALE, DEFAULT_RADAR_SCALE)
+            }
+            if (!sharedPreferences.contains(KEY_RADAR_SHOW_CIRCLE)) {
+                editor.putBoolean(KEY_RADAR_SHOW_CIRCLE, true)
+            }
+
+            listOf(
+                KEY_HARVESTING_FIBER, KEY_HARVESTING_HIDE, KEY_HARVESTING_ORE,
+                KEY_HARVESTING_ROCK, KEY_HARVESTING_WOOD,
+                KEY_MOB_HARVESTABLE, KEY_MOB_ENEMY, KEY_MOB_BOSS, KEY_MOB_MIST_BOSS,
+                KEY_CHEST, KEY_DUNGEON, KEY_MIST
+            ).forEach { key ->
+                if (!sharedPreferences.contains(key)) {
+                    editor.putBoolean(key, true)
+                }
+            }
+
+            editor.apply()
+            Log.d(TAG, "Default preferences initialized")
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to initialize preferences", e)
         }
-
-        if (!sharedPreferences.contains(KEY_CHEST)) {
-            editor.putBoolean(KEY_CHEST, true)
-        }
-        if (!sharedPreferences.contains(KEY_DUNGEON)) {
-            editor.putBoolean(KEY_DUNGEON, true)
-        }
-        if (!sharedPreferences.contains(KEY_MIST)) {
-            editor.putBoolean(KEY_MIST, true)
-        }
-
-        editor.apply()
     }
 
-    fun getLocalPlayerId(): Int {
-        return sharedPreferences.getInt(KEY_LOCAL_PLAYER_ID, -1)
-    }
+    fun getLocalPlayerId(): Int = sharedPreferences.getInt(KEY_LOCAL_PLAYER_ID, -1)
+    fun setLocalPlayerId(id: Int) = sharedPreferences.edit().putInt(KEY_LOCAL_PLAYER_ID, id).apply()
 
-    fun setLocalPlayerId(id: Int) {
-        sharedPreferences.edit().putInt(KEY_LOCAL_PLAYER_ID, id).apply()
-    }
+    fun getLocalPlayerX(): Float = sharedPreferences.getFloat(KEY_LOCAL_PLAYER_X, 0f)
+    fun setLocalPlayerX(x: Float) = sharedPreferences.edit().putFloat(KEY_LOCAL_PLAYER_X, x).apply()
 
-    fun getLocalPlayerX(): Float {
-        return sharedPreferences.getFloat(KEY_LOCAL_PLAYER_X, 0f)
-    }
+    fun getLocalPlayerY(): Float = sharedPreferences.getFloat(KEY_LOCAL_PLAYER_Y, 0f)
+    fun setLocalPlayerY(y: Float) = sharedPreferences.edit().putFloat(KEY_LOCAL_PLAYER_Y, y).apply()
 
-    fun setLocalPlayerX(x: Float) {
-        sharedPreferences.edit().putFloat(KEY_LOCAL_PLAYER_X, x).apply()
-    }
-
-    fun getLocalPlayerY(): Float {
-        return sharedPreferences.getFloat(KEY_LOCAL_PLAYER_Y, 0f)
-    }
-
-    fun setLocalPlayerY(y: Float) {
-        sharedPreferences.edit().putFloat(KEY_LOCAL_PLAYER_Y, y).apply()
-    }
-
-    fun isVpnRunning(): Boolean {
-        return sharedPreferences.getBoolean(KEY_VPN_RUNNING, false)
-    }
-
-    fun setVpnRunning(running: Boolean) {
-        sharedPreferences.edit().putBoolean(KEY_VPN_RUNNING, running).apply()
-    }
+    fun isVpnRunning(): Boolean = sharedPreferences.getBoolean(KEY_VPN_RUNNING, false)
+    fun setVpnRunning(running: Boolean) = sharedPreferences.edit().putBoolean(KEY_VPN_RUNNING, running).apply()
 }
