@@ -3,15 +3,16 @@ package com.gxradar.model
 /**
  * Entity types recognized by the radar system.
  * Each type maps to specific rendering rules (color, shape, size).
+ * 
+ * NOTE: RESOURCE_CROP removed - not useful for radar functionality.
  */
 enum class EntityType {
-    // Resources
+    // Resources (Static & Living)
     RESOURCE_FIBER,
     RESOURCE_ORE,
     RESOURCE_LOGS,
     RESOURCE_ROCK,
     RESOURCE_HIDE,
-    RESOURCE_CROP,
 
     // Mobs
     NORMAL_MOB,
@@ -82,8 +83,7 @@ data class RadarEntity(
         EntityType.RESOURCE_ORE,
         EntityType.RESOURCE_LOGS,
         EntityType.RESOURCE_ROCK,
-        EntityType.RESOURCE_HIDE,
-        EntityType.RESOURCE_CROP
+        EntityType.RESOURCE_HIDE
     )
 
     /**
@@ -113,6 +113,20 @@ data class RadarEntity(
         return if (tier > 0) {
             if (enchant > 0) "T$tier.$enchant" else "T$tier"
         } else ""
+    }
+
+    /**
+     * Get resource type string for display
+     */
+    fun getResourceTypeDisplay(): String {
+        return when (type) {
+            EntityType.RESOURCE_FIBER -> "Fiber"
+            EntityType.RESOURCE_ORE -> "Ore"
+            EntityType.RESOURCE_LOGS -> "Logs"
+            EntityType.RESOURCE_ROCK -> "Rock"
+            EntityType.RESOURCE_HIDE -> "Hide"
+            else -> typeName
+        }
     }
 
     companion object {
@@ -160,7 +174,20 @@ data class RadarEntity(
                 upper.contains("WOOD") || upper.contains("LOG") -> EntityType.RESOURCE_LOGS
                 upper.contains("ROCK") || upper.contains("STONE") -> EntityType.RESOURCE_ROCK
                 upper.contains("HIDE") || upper.contains("LEATHER") -> EntityType.RESOURCE_HIDE
-                upper.contains("WHEAT") || upper.contains("CROP") -> EntityType.RESOURCE_CROP
+                else -> EntityType.UNKNOWN
+            }
+        }
+
+        /**
+         * Get resource type from typeNumber (0-27)
+         */
+        fun getResourceTypeFromTypeNumber(typeNumber: Int): EntityType {
+            return when (typeNumber) {
+                in 0..5 -> EntityType.RESOURCE_LOGS
+                in 6..10 -> EntityType.RESOURCE_ROCK
+                in 11..15 -> EntityType.RESOURCE_FIBER
+                in 16..22 -> EntityType.RESOURCE_HIDE
+                in 23..27 -> EntityType.RESOURCE_ORE
                 else -> EntityType.UNKNOWN
             }
         }
