@@ -1,6 +1,6 @@
 {
-  "version": "2026-03-16-v2",
-  "comment": "Photon param key mappings. Update after each Albion patch. Set key to -1 to force Plan B.",
+  "version": "2025-03-18-v3",
+  "comment": "Photon param key mappings - Updated from OpenRadar. Set key to -1 to force Plan B.",
 
   "common": {
     "objectIdKey": 0,
@@ -65,22 +65,47 @@
     "logs": ["WOOD", "LOG", "BIRCH", "OAK", "CEDAR", "PINE", "FROSTWOOD"],
     "rock": ["ROCK", "STONE", "LIMESTONE", "SANDSTONE", "TRAVERTINE", "GRANITE"],
     "hide": ["HIDE", "LEATHER", "REPTILE", "BEAR", "DIREWOLF"],
-    "crop": ["WHEAT", "CROP", "CARROT", "TURNIP", "CABBAGE", "BEAN"],
-    "mist": ["MIST_WISP", "MIST_KEEPER", "MIST_HERALD", "MISTS_CAGEDWISP"],
     "boss": ["BOSS", "ELDER", "ANCIENT", "GUARDIAN", "KEEPER", "MISTBOSS"]
   },
 
   "eventCodeSeeds": {
-    "comment": "Seed table only — populated fully by DiscoveryLogger on first run. DO NOT dispatch by these ints.",
-    "1": "NewCharacter",
-    "2": "Leave",
+    "comment": "Event codes from OpenRadar EventCodes.js",
+    "1": "Leave",
+    "2": "JoinFinished",
     "3": "Move",
-    "4": "NewMob",
-    "5": "NewSimpleHarvestableObject",
-    "18": "JoinFinished",
-    "19": "NewSimpleHarvestableObjectList",
-    "20": "ChangeCluster",
-    "24": "HarvestFinished"
+    "4": "Teleport",
+    "6": "HealthUpdate",
+    "7": "HealthUpdates",
+    "29": "NewCharacter",
+    "38": "NewSimpleHarvestableObjectList",
+    "39": "NewSimpleHarvestableObjectList",
+    "40": "NewHarvestableObject",
+    "46": "HarvestableChangeState",
+    "47": "MobChangeState",
+    "59": "HarvestStart",
+    "60": "HarvestCancel",
+    "61": "HarvestFinished",
+    "91": "RegenerationHealthChanged",
+    "123": "NewMob",
+    "137": "GetCharacterStats",
+    "203": "StartLogout",
+    "209": "Mounted",
+    "252": "NewLootChest",
+    "317": "NewPortalEntrance",
+    "319": "NewRandomDungeonExit",
+    "355": "NewFishingZoneObject",
+    "387": "NewLootChest",
+    "518": "NewMistsWispSpawn",
+    "525": "NewCagedObject",
+    "526": "CagedObjectStateUpdated"
+  },
+
+  "operationCodes": {
+    "comment": "Operation codes for request/response handling",
+    "2": "JoinFinished",
+    "21": "Move",
+    "35": "ChangeCluster",
+    "137": "GetCharacterStats"
   },
 
   "coordinatePlanB": {
